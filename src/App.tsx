@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Bookmark, Star, Heart, Clapperboard, Trash2 } from "lucide-react";
+import { Bookmark, Star, Heart, Trash2 } from "lucide-react";
 import { Movie, Genre, FavoriteMovie } from "./types";
 import {
   fetchTrendingMovies,
@@ -7,7 +7,6 @@ import {
   fetchPopularMovies,
   fetchUpcomingMovies,
   fetchGenreList,
-  fetchMoviesByGenre,
   getPosterUrl,
 } from "./lib/tmdb";
 
@@ -19,8 +18,10 @@ import StatsSection from "./components/StatsSection";
 import SearchOverlay from "./components/SearchOverlay";
 import MovieDetailModal from "./components/MovieDetailModal";
 
+type AppTab = "inicio" | "peliculas" | "generos" | "favoritos";
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState<string>("inicio");
+  const [activeTab, setActiveTab] = useState<AppTab>("inicio");
   const [genres, setGenres] = useState<Genre[]>([]);
   const [genresMap, setGenresMap] = useState<Record<number, string>>({});
 
@@ -32,8 +33,6 @@ export default function App() {
 
   // Genre filtering lane state
   const [selectedGenreId, setSelectedGenreId] = useState<number | null>(null);
-  const [genreFilteredMovies, setGenreFilteredMovies] = useState<Movie[]>([]);
-  const [genreLoading, setGenreLoading] = useState<boolean>(false);
 
   // Favorites collection persisted in localStorage
   const [favorites, setFavorites] = useState<FavoriteMovie[]>(() => {
@@ -101,30 +100,6 @@ export default function App() {
     loadAppData();
   }, []);
 
-  // Fetch movies by genre list when genreId changes
-  useEffect(() => {
-    if (selectedGenreId === null) {
-      setGenreFilteredMovies([]);
-      return;
-    }
-
-    async function loadGenreMovies() {
-      setGenreLoading(true);
-      try {
-        if (selectedGenreId !== null) {
-          const fetched = await fetchMoviesByGenre(selectedGenreId);
-          setGenreFilteredMovies(fetched);
-        }
-      } catch (err) {
-        console.error("Error loading movies by genre:", err);
-      } finally {
-        setGenreLoading(false);
-      }
-    }
-
-    loadGenreMovies();
-  }, [selectedGenreId]);
-
   // Synchronize favorites state with localStorage
   useEffect(() => {
     localStorage.setItem("cinemax_favorites", JSON.stringify(favorites));
@@ -164,16 +139,22 @@ export default function App() {
 
   const handleGenreSelect = (genreId: number | null) => {
     setSelectedGenreId(genreId);
-    if (genreId !== null) {
-      // Auto scroll to genre exploring list
-      setTimeout(() => {
-        const element = document.getElementById("exploring-genre");
-        if (element) {
-          element.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
-      }, 100);
-    }
   };
+
+  const selectedGenreName = selectedGenreId !== null ? genresMap[selectedGenreId] : null;
+
+  const applyGenreFilter = (movies: Movie[]): Movie[] => {
+    if (selectedGenreId === null) {
+      return movies;
+    }
+    return movies.filter((movie) => movie.genre_ids.includes(selectedGenreId));
+  };
+
+  const filteredRecents = applyGenreFilter(recents);
+  const filteredTrending = applyGenreFilter(trending);
+  const filteredTopRated = applyGenreFilter(topRated);
+  const filteredPopular = applyGenreFilter(popular);
+  const filteredUpcoming = applyGenreFilter(upcoming);
 
   return (
     <div id="app-root-container" className="min-h-screen bg-[#0A0A0A] text-white flex flex-col font-sans selection:bg-[#E50914] selection:text-white">
@@ -217,75 +198,13 @@ export default function App() {
               onGenreSelect={handleGenreSelect}
             />
 
-            {/* Dynamic Genre Filter Row */}
-            {selectedGenreId !== null && (
-              <section id="exploring-genre" className="px-6 md:px-16 scroll-mt-24">
-                <div className="max-w-7xl mx-auto w-full">
-                  <div className="flex items-center gap-3 mb-6">
-                    <Clapperboard className="w-6 h-6 text-[#E50914]" />
-                    <h2 className="font-display text-2xl sm:text-3xl text-white font-extrabold tracking-wide uppercase">
-                      Explorando género: <span className="text-[#E50914]">{genresMap[selectedGenreId]}</span>
-                    </h2>
-                  </div>
-
-                  {genreLoading ? (
-                    <div className="flex items-center justify-center py-20 flex-col gap-3">
-                      <div className="w-8 h-8 border-3 border-[#E50914] border-t-transparent rounded-full animate-spin"></div>
-                      <p className="font-sans text-xs text-neutral-500 uppercase tracking-widest animate-pulse">
-                        Cargando catálogo...
-                      </p>
-                    </div>
-                  ) : genreFilteredMovies.length === 0 ? (
-                    <div className="text-center py-16 text-neutral-500 font-sans text-sm">
-                      No se encontraron películas para este género en la base de datos local.
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
-                      {genreFilteredMovies.map((movie) => {
-                        const posterSrc = getPosterUrl(movie.poster_path);
-                        const year = movie.release_date
-                          ? new Date(movie.release_date).getFullYear()
-                          : "2026";
-
-                        return (
-                          <div
-                            id={`genre-filtered-card-${movie.id}`}
-                            key={movie.id}
-                            onClick={() => setSelectedMovieId(movie.id)}
-                            className="group cursor-pointer transition-all duration-300 transform hover:-translate-y-1.5"
-                          >
-                            <div className="relative aspect-[2/3] overflow-hidden rounded-lg border border-white/5 bg-neutral-950 group-hover:border-red-500/50 group-hover:shadow-[0_0_24px_rgba(229,9,20,0.3)]">
-                              <img
-                                src={posterSrc}
-                                alt={movie.title}
-                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 pointer-events-none"
-                                loading="lazy"
-                              />
-                              <div className="absolute bottom-3 left-3 flex items-center gap-1 text-[#ffdb3c] bg-black/60 px-2 py-0.5 rounded-sm text-xs font-bold font-sans">
-                                <Star className="w-3.5 h-3.5 fill-[#ffdb3c] stroke-[#ffdb3c]" />
-                                <span>{movie.vote_average.toFixed(1)}</span>
-                              </div>
-                            </div>
-                            <h4 className="mt-3 font-sans text-sm font-semibold text-white truncate group-hover:text-[#E50914] transition-colors">
-                              {movie.title}
-                            </h4>
-                            <p className="font-sans text-xs text-neutral-500 mt-0.5">{year}</p>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </section>
-            )}
-
             {/* Continuar viendo (Recent views) row */}
-            {recents.length > 0 && (
+            {filteredRecents.length > 0 && (
               <div id="continuar-viendo" className="space-y-12 md:space-y-16">
                 <MovieRow
-                  title="Continuar viendo"
+                  title={selectedGenreName ? `Películas de ${selectedGenreName}` : "Continuar viendo"}
                   icon="🍿"
-                  movies={recents}
+                  movies={filteredRecents}
                   onMovieClick={(id) => setSelectedMovieId(id)}
                 />
               </div>
@@ -294,27 +213,27 @@ export default function App() {
             {/* 4. Categorized Movie lanes */}
             <div id="peliculas" className="space-y-12 md:space-y-16">
               <MovieRow
-                title="Tendencia esta semana"
+                title={selectedGenreName ? `Películas de ${selectedGenreName}` : "Tendencia esta semana"}
                 icon="🔥"
-                movies={trending}
+                movies={filteredTrending}
                 onMovieClick={(id) => setSelectedMovieId(id)}
               />
               <MovieRow
-                title="Mejor calificadas"
+                title={selectedGenreName ? `Películas de ${selectedGenreName}` : "Mejor calificadas"}
                 icon="⭐"
-                movies={topRated}
+                movies={filteredTopRated}
                 onMovieClick={(id) => setSelectedMovieId(id)}
               />
               <MovieRow
-                title="Populares ahora"
+                title={selectedGenreName ? `Películas de ${selectedGenreName}` : "Populares ahora"}
                 icon="🎬"
-                movies={popular}
+                movies={filteredPopular}
                 onMovieClick={(id) => setSelectedMovieId(id)}
               />
               <MovieRow
-                title="Próximos estrenos"
+                title={selectedGenreName ? `Películas de ${selectedGenreName}` : "Próximos estrenos"}
                 icon="🆕"
-                movies={upcoming}
+                movies={filteredUpcoming}
                 onMovieClick={(id) => setSelectedMovieId(id)}
               />
             </div>
@@ -455,7 +374,7 @@ export default function App() {
               Películas
             </a>
             <a
-              href="#genres"
+              href="#generos"
               className="font-sans text-xs font-semibold text-neutral-400 hover:text-white transition-colors uppercase tracking-widest"
             >
               Géneros

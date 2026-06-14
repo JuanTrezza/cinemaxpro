@@ -19,8 +19,13 @@ export default function GenrePills({
   // If TMDB returns different translated words, let's fall back to showing the first 12 genres
   const listToRender = displayGenres.length > 0 ? displayGenres : genres.slice(0, 14);
 
+  const selectedGenreName =
+    selectedGenreId !== null
+      ? genres.find((genre) => genre.id === selectedGenreId)?.name
+      : null;
+
   return (
-    <div id="genres" className="px-6 md:px-16 py-6 select-none scroll-mt-24">
+    <div id="generos" className="px-6 md:px-16 py-6 select-none scroll-mt-24">
       <div id="genre-pills" className="flex gap-3 overflow-x-auto no-scrollbar pb-3 -mx-4 px-4 sm:mx-0 sm:px-0">
         <button
           id="genre-pill-all"
@@ -51,6 +56,17 @@ export default function GenrePills({
             </button>
           );
         })}
+
+        {selectedGenreId !== null && (
+          <button
+            id="genre-pill-clear"
+            onClick={() => onGenreSelect(null)}
+            className="px-5 py-2 rounded-full border border-[#E50914]/80 text-[#E50914] hover:text-white hover:bg-[#E50914] text-xs md:text-sm font-semibold whitespace-nowrap tracking-wide transition-all cursor-pointer"
+            title={selectedGenreName ? `Limpiar filtro de ${selectedGenreName}` : "Limpiar filtro"}
+          >
+            ✕ Limpiar filtro
+          </button>
+        )}
       </div>
     </div>
   );
