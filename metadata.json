@@ -1,0 +1,6 @@
+{
+  "name": "CINEMAX PRO",
+  "description": "Tu cine privado premium: explora, busca y guarda tus películas favoritas con una interfaz inmersiva y estadísticas detalladas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
